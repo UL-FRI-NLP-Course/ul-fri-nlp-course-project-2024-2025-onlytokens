@@ -335,6 +335,16 @@ if __name__ == "__main__":
     )
     
     # Run pipeline
-    query =  "Kdo je Marko Robnik Sikonja?"
+    print("\033[92m")  # Green color
+    print(r"""
+    ____        __     ______      __                
+   / __ \____  / /_  _/_  __/___  / /_____  ____  ___
+  / / / / __ \/ / / / // / / __ \/ //_/ _ \/ __ \/ __/
+ / /_/ / / / / / /_/ // / / /_/ / ,< /  __/ / / /\ \  
+/_____/_/ /_/_/\__, //_/  \____/_/|_|\___/_/ /_/___/  
+              /____/                                  
+    """)
+    print("\033[0m")  # Reset color
+    query = input("\033[94mWhat do you want to know? \033[0m")  # Blue color for input prompt
     response = pipeline.run_sync(query)
 
