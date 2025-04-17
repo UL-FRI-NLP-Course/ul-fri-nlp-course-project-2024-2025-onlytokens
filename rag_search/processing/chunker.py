@@ -69,12 +69,12 @@ class Chunker:
         """
         return [self.split_text(text) for text in texts]
     
-    def split_scraped_content(self, scraped_content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def split_scraped_content(self, simplified_content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Split scraped content into chunks while preserving metadata.
         
         Args:
-            scraped_content (List[Dict[str, Any]]): A list of dictionaries containing
-                scraped content with 'url' and 'content' fields.
+            simplified_content (List[Dict[str, Any]]): A list of dictionaries containing
+                'content' and 'url' fields.
                 
         Returns:
             List[Dict[str, Any]]: A list of dictionaries containing chunked content
@@ -82,37 +82,18 @@ class Chunker:
         """
         chunks = []
         
-        for idx, content_item in enumerate(scraped_content):
-            # Get content from the 'no_extraction' strategy if available, otherwise use the first available
-            if isinstance(content_item, dict) and 'no_extraction' in content_item:
-                source_content = content_item['no_extraction'].content if content_item['no_extraction'].success else None
-                url = content_item['no_extraction'].url
-                metadata = content_item['no_extraction'].metadata or {}
-            elif isinstance(content_item, dict) and content_item:
-                # Get the first successful strategy
-                for strategy_name, strategy_result in content_item.items():
-                    if strategy_result.success and strategy_result.content:
-                        source_content = strategy_result.content
-                        url = strategy_result.url
-                        metadata = strategy_result.metadata or {}
-                        break
-                else:
-                    # No successful strategy found
-                    continue
-            else:
-                # Fallback for simple dictionaries with direct content
-                source_content = content_item.get('content')
-                url = content_item.get('url')
-                metadata = content_item.get('metadata', {})
+        for idx, item in enumerate(simplified_content):
+            content = item.get('content')
+            url = item.get('url')
             
-            if not source_content:
+            if not content or not url:
                 continue
                 
             # Split the content into chunks
-            text_chunks = self.split_text(source_content)
+            text_chunks = self.split_text(content)
             
             if self.verbose:
-                print(f"[DEBUG] Split source {idx} into {len(text_chunks)} chunks")
+                print(f"[DEBUG] Split {url} into {len(text_chunks)} chunks")
             
             # Create chunk objects with source metadata
             for chunk_idx, chunk_text in enumerate(text_chunks):
@@ -120,13 +101,8 @@ class Chunker:
                     'content': chunk_text,
                     'url': url,
                     'chunk_index': chunk_idx,
-                    'source_index': idx,
                     'total_chunks': len(text_chunks)
                 }
-                
-                # Preserve any additional metadata
-                if metadata:
-                    chunk_obj['metadata'] = metadata
                 
                 chunks.append(chunk_obj)
         

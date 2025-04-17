@@ -19,7 +19,7 @@ class SearXNGProvider(SearchProvider):
     
     def __init__(
         self,
-        instance_url: Optional[str] = "http://localhost:8080/search",
+        instance_url: Optional[str] = "http://localhost:5555/search",
         api_key: Optional[str] = None,
         default_location: str = "all",
         timeout: int = 10,
@@ -84,6 +84,7 @@ class SearXNGProvider(SearchProvider):
             log_input(query, "SearXNGProvider")
                 
         # Set up request parameters
+        #TODO: we should use the search provider's location and time to refine the query ALSO maybe limit the timerange see query enhancer
         params = {
             'q': query,
             'format': 'json',
@@ -148,12 +149,15 @@ class SearXNGProvider(SearchProvider):
             
         # Extract organic results
         organic_results = []
+        #SAVE RESULTS TO A FILE
+        with open('search_results.json', 'w') as f:
+            json.dump(data, f)
         for result in data.get('results', [])[:num_results]:
             organic_results.append({
                 'title': result.get('title', ''),
                 'link': result.get('url', ''),
                 'snippet': result.get('content', ''),
-                'date': result.get('publishedDate', '')
+                'date': result.get('publishedDate', '') #NOTE SOME results have this empty!!!   
             })
             
         # Extract image results
@@ -170,9 +174,21 @@ class SearXNGProvider(SearchProvider):
             'organic': organic_results,
             'images': image_results,
             'topStories': [],  # SearXNG doesn't have direct equivalent
-            'answerBox': None,  # SearXNG doesn't provide answer box
+            'answerBox': None,  # SearXNG doesn't provide answer box some search providers do!
             'peopleAlsoAsk': None,
-            'relatedSearches': data.get('suggestions', [])
+            'relatedSearches': data.get('suggestions', []) 
+            #TODO we can use these to genarate even beter queries and to do more searches!
+            # example response:
+            # "suggestions": [
+            # "Second hand shop online",
+            # "Second Hand shop online slovenija",
+            # "Second hand shop Maribor",
+            # "Second hand Ljubljana",
+            # "Second hand hahaha mnenja",
+            # "Second hand shop ptuj",
+            # "Second hand trgovina",
+            # "Odkup rabljenih oblačil maribor"
+            #   ],
         }
 
 if __name__ == "__main__":
@@ -180,7 +196,6 @@ if __name__ == "__main__":
     
     async def test():
         provider = SearXNGProvider(
-            instance_url="http://localhost:8080/search",
             verbose=True
         )
         

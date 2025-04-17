@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 from termcolor import colored
+import sys
 
 # Map of component names to colors for visual distinction
 COMPONENT_COLORS = {
@@ -13,7 +14,9 @@ COMPONENT_COLORS = {
     "ContextBuilder": "yellow",
     "OpenAI": "green",
     "LLM": "green",
-    "RAGSearchPipeline": "light_magenta"
+    "RAGSearchPipeline": "light_magenta",
+    "OpenAIEmbedder": "light_magenta",
+    "LukaContextBuilder": "light_yellow"
 }
 
 def get_component_color(component: str) -> str:
@@ -117,4 +120,29 @@ def log_chunks(chunks: List[Dict[str, Any]], component: str, max_display: int = 
         print(colored(f"  [{component}] Chunk #{i+1}: {content}", color))
         print(colored(f"        Source: {url}", "white"))
         if similarity is not None:
-            print(colored(f"        Relevance: {similarity:.4f}", "white")) 
+            print(colored(f"        Relevance: {similarity:.4f}", "white"))
+
+def log_stream_chunk(chunk: str, component: str, is_first: bool = False, is_last: bool = False):
+    """Log a streaming chunk with visual indicators for stream progress.
+    
+    Args:
+        chunk: The text chunk to log
+        component: The component name for coloring
+        is_first: Whether this is the first chunk of the stream
+        is_last: Whether this is the last chunk of the stream
+    """
+    color = get_component_color(component)
+    
+    # For the first chunk, start with the stream indicator
+    if is_first:
+        sys.stdout.write(colored(f"\n  [{component}] 🔄 ", color))
+        sys.stdout.flush()
+    
+    # Write the chunk
+    sys.stdout.write(colored(chunk, color))
+    sys.stdout.flush()
+    
+    # For the last chunk, add a newline and completion indicator
+    if is_last:
+        sys.stdout.write(colored(" ✓\n", color))
+        sys.stdout.flush() 
