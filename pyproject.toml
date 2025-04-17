@@ -1,1 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
+[project]
+name = "rag_search"
+version = "0.1.0"
+description = "RAG Search implementation"
+requires-python = ">=3.8"
+dependencies = [
+    "requests",
+    "beautifulsoup4",
+    "transformers",
+    "torch",
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["rag_search"]

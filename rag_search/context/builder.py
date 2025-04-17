@@ -368,3 +368,114 @@ class StructuredContextBuilder(ContextBuilder):
         #     result = "".join(parts)
             
         return result
+
+class LukaContextBuilder(ContextBuilder):
+    """Context builder that formats content with prompting instructions."""
+    
+    def __init__(
+        self,
+        include_scores: bool = True,
+        verbose: bool = False
+    ):
+        """
+        Initialize context builder.
+        
+        Args:
+            include_scores: Whether to include relevance scores
+            verbose: Whether to enable verbose logging
+        """
+        self.include_scores = include_scores
+        self.verbose = verbose
+        
+        if self.verbose:
+            log_info("Context builder ready!", "LukaContextBuilder")
+
+    def _get_prompt_template(self) -> str:
+        """Get the prompt template for the LLM."""
+        return '''### Query:
+{query}
+
+### Context:
+<context>
+{context}
+</context>
+
+### Instructions:
+You are a helpful AI assistant. Answer the query naturally and conversationally using the provided context.
+- Use information from the context to support your answer
+- Cite sources using [1], [2] etc. when referencing specific information
+- Be concise and direct
+- If you're not sure about something, say so
+- If the context doesn't help answer the query, use your own knowledge but mention this
+- Respond in the same language as the query
+- Focus on being helpful rather than explaining your citations
+
+Example of good response style:
+"John Smith is a software engineer at Google [1] who specializes in machine learning. He previously worked at Microsoft [2] and has published several papers on AI safety."
+
+### Response:'''
+
+    def build(
+        self,
+        processed_content: List[Dict[str, Any]],
+        search_results: Dict[str, Any]
+    ) -> str:
+        """
+        Build context from processed content and search results using Luka formatting.
+        
+        Args:
+            processed_content: List of processed content chunks
+            search_results: Original search results (not used)
+            
+        Returns:
+            Formatted context string with XML tags and prompting instructions
+        """
+        if self.verbose:
+            log_operation_start("BUILDING CONTEXT", "LukaContextBuilder")
+            log_input(f"{len(processed_content)} content chunks", "LukaContextBuilder")
+
+        # Start building the context sections
+        context_parts = []
+        
+        # Process content chunks
+        if processed_content:
+            if self.verbose:
+                log_info(f"Adding {len(processed_content)} content chunks", "LukaContextBuilder")
+            
+            for i, chunk in enumerate(processed_content, 1):
+                if 'content' not in chunk or 'url' not in chunk:
+                    continue
+                    
+                # Build source tag with attributes
+                source_attrs = [
+                    f'url="{chunk["url"]}"',
+                    f'id="{i}"'
+                ]
+                
+                if self.include_scores and 'similarity' in chunk:
+                    score = chunk['similarity']
+                    source_attrs.append(f'relevance="{score:.2f}"')
+                
+                # Format the chunk with XML tags
+                chunk_text = [
+                    f"<source {' '.join(source_attrs)}>",
+                    chunk['content'],
+                    "</source>"
+                ]
+                
+                context_parts.append("\n".join(chunk_text))
+
+        # Combine all parts
+        context = "\n\n".join(context_parts)
+        
+        if self.verbose:
+            log_success("prompt built successfully", "LukaContextBuilder")
+            log_output(f"Context with {len(context)} characters", "LukaContextBuilder")
+            log_operation_end("BUILDING CONTEXT", "LukaContextBuilder")
+
+        # Get the prompt template and format with context
+        prompt_template = self._get_prompt_template()
+        return prompt_template.format(
+            context=context,
+            query="{query}"  # This will be replaced by the actual query later
+        )

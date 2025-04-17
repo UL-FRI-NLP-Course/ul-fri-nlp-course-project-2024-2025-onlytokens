@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, AsyncGenerator
 import os
 import asyncio
 import json
@@ -8,7 +8,8 @@ from rag_search.llm.provider import LLMProvider, LLMException
 from rag_search.llm.prompts import DEFAULT_SYSTEM_PROMPT
 from rag_search.utils.logging import (
     log_operation_start, log_operation_end, log_info,
-    log_input, log_output, log_success, log_error
+    log_input, log_output, log_success, log_error,
+    log_stream_chunk
 )
 
 class OpenAIProvider(LLMProvider):
@@ -65,6 +66,80 @@ class OpenAIProvider(LLMProvider):
         """Get the context window size for the LLM."""
         return self._context_length
     
+    async def generate_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = 0.7,
+        max_tokens: Optional[int] = 1024
+    ) -> AsyncGenerator[str, None]:
+        """
+        Generate a streaming response using OpenAI API.
+        
+        Args:
+            messages: List of message objects with role and content
+            system_prompt: Optional system prompt to override default
+            temperature: Optional temperature parameter
+            max_tokens: Optional maximum tokens to generate
+            
+        Yields:
+            Generated response text chunks
+        """
+        # If system prompt is provided, add it at the beginning
+        if system_prompt:
+            messages = [{"role": "system", "content": system_prompt}] + messages
+       
+        # Log request if verbose
+        if self.verbose:
+            log_operation_start("GENERATING STREAMING RESPONSE", "LLM")
+            log_info(f"Using model: {self.model}", "LLM")
+            
+            # Log the last user message as input
+            for msg in reversed(messages):
+                if msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    log_input(f"Query: {content}", "LLM")
+                    break
+        
+        try:
+            # Run the completion in a thread pool since it's blocking
+            loop = asyncio.get_event_loop()
+            stream = await loop.run_in_executor(
+                None,
+                lambda: self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    stream=True,
+                    **self.additional_kwargs
+                )
+            )
+            
+            collected_chunks = []
+            is_first = True
+            for chunk in stream:
+                if chunk and chunk.choices and len(chunk.choices) > 0:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        collected_chunks.append(content)
+                        if self.verbose:
+                            log_stream_chunk(content, "LLM", is_first=is_first, is_last=False)
+                        is_first = False
+                        yield content
+            
+            # Log final chunk marker if verbose
+            if self.verbose and not is_first:  # Only if we output something
+                log_stream_chunk("", "LLM", is_first=False, is_last=True)
+                log_success(f"Generated {len(''.join(collected_chunks))} chars", "LLM")
+                log_operation_end("GENERATING STREAMING RESPONSE", "LLM")
+                
+        except Exception as e:
+            if self.verbose:
+                log_error(f"Generation failed: {str(e)}", "LLM")
+                log_operation_end("GENERATING STREAMING RESPONSE", "LLM")
+            raise LLMException(f"Error generating streaming response with OpenAI: {str(e)}")
+    
     async def generate(
         self,
         messages: List[Dict[str, Any]],
@@ -84,61 +159,12 @@ class OpenAIProvider(LLMProvider):
         Returns:
             Generated response text
         """
-        # If system prompt is provided, add it at the beginning
-        if system_prompt:
-            messages = [{"role": "system", "content": system_prompt}] + messages
-       
-        # Log request if verbose
-        if self.verbose:
-            log_operation_start("GENERATING RESPONSE", "LLM")
-            log_info(f"Using model: {self.model}", "LLM")
-            
-            # Log the last user message as input
-            for msg in reversed(messages):
-                if msg.get("role") == "user":
-                    content = msg.get("content", "")
-                    log_input(f"Query: {content}", "LLM")
-                    break
-        
-        # Run the model in a thread pool to avoid blocking the event loop
-        loop = asyncio.get_event_loop()
-        
-        try:
-            response = await loop.run_in_executor(
-                None,
-                lambda: self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    **self.additional_kwargs
-                )
-            )
-            
-            # Extract the response text
-            if response and hasattr(response, "choices") and len(response.choices) > 0:
-                result = response.choices[0].message.content.strip()
-                
-                # Log response if verbose
-                if self.verbose:
-                    # Log token usage
-                    if hasattr(response, "usage") and response.usage:
-                        prompt_tokens = response.usage.prompt_tokens
-                        completion_tokens = response.usage.completion_tokens
-                        total_tokens = response.usage.total_tokens
-                        log_info(f"Tokens: {prompt_tokens} prompt + {completion_tokens} completion = {total_tokens} total", "LLM")
-                    
-                    # Log full response without truncation
-                    log_output(f"Response: {result}", "LLM")
-                    log_success(f"Generated {len(result)} chars", "LLM")
-                    log_operation_end("GENERATING RESPONSE", "LLM")
-                
-                return result
-            else:
-                raise LLMException("Failed to get a valid response from the model")
-                
-        except Exception as e:
-            if self.verbose:
-                log_error(f"Generation failed: {str(e)}", "LLM")
-                log_operation_end("GENERATING RESPONSE", "LLM")
-            raise LLMException(f"Error generating response with OpenAI: {str(e)}") 
+        chunks = []
+        async for chunk in self.generate_stream(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens
+        ):
+            chunks.append(chunk)
+        return "".join(chunks) 
