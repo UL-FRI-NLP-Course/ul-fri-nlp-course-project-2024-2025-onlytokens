@@ -13,10 +13,11 @@ COMPONENT_COLORS = {
     "CrossEncoder": "light_magenta",
     "ContextBuilder": "yellow",
     "OpenAI": "green",
-    "LLM": "green",
+    "LLM": "black",
     "RAGSearchPipeline": "light_magenta",
     "OpenAIEmbedder": "light_magenta",
-    "LukaContextBuilder": "light_yellow"
+    "LukaContextBuilder": "light_yellow",
+    "QualityImprover": "light_yellow"
 }
 
 def get_component_color(component: str) -> str:
@@ -131,11 +132,11 @@ def log_stream_chunk(chunk: str, component: str, is_first: bool = False, is_last
         is_first: Whether this is the first chunk of the stream
         is_last: Whether this is the last chunk of the stream
     """
-    color = get_component_color(component)
+    color = "green"
     
     # For the first chunk, start with the stream indicator
     if is_first:
-        sys.stdout.write(colored(f"\n  [{component}] 🔄 ", color))
+        sys.stdout.write(colored(f"\n  [{component}]", color))
         sys.stdout.flush()
     
     # Write the chunk

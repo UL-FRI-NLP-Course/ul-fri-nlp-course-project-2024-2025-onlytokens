@@ -16,6 +16,7 @@ from rag_search.scraping.basic_web_scraper import ExtractionConfig
 from rag_search.scraping.extraction_result import ExtractionResult, print_extraction_result
 from rag_search.scraping.quality_scorer import QualityImprover
 from rag_search.scraping.strategy_factory import StrategyFactory
+from rag_search.utils.logging import log_error, log_info
 
 
 class MarkdownChunking(ChunkingStrategy):
@@ -202,11 +203,8 @@ class WebScraper:
             config.extraction_strategy = extraction_config.strategy
 
             if self.debug:
-                print(f"\nDebug: Attempting extraction with strategy: {extraction_config.name}")
-                print(f"Debug: URL: {url}")
-                print(f"Debug: Strategy config: {config.extraction_strategy}")
-                if self.user_query:
-                    print(f"Debug: User query: {self.user_query}")
+                log_info(f"Scraping {url} with strategy {extraction_config.name}", "WebScraper")
+
 
             async with AsyncWebCrawler(config=self.browser_config) as crawler:
                 if isinstance(url, list):
@@ -262,7 +260,10 @@ class WebScraper:
                         content = self.quality_improver.filter_quality_content(content)
 
             if self.debug:
-                print(f"Debug: Processed content: {content[:100] if content else None}")
+                if content:
+                    log_info(f"Scraped content: {content[:100].strip().replace('\n', ' ').replace('\r', ' ')}", "WebScraper")
+                else:
+                    log_error(f"Unable to scrape content from {url}", "WebScraper")
                 #save to file
                 if content:
                     with open("content.txt", "w") as f:
