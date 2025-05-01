@@ -1,0 +1,60 @@
+api:
+  openai:
+    api_key: ${OPENAI_API_KEY}  # OpenAI API key from environment variables
+    api_url: https://api.openai.com/v1  # Base URL for OpenAI API endpoints
+    embedding_model: text-embedding-3-small  # Model used for text embeddings
+    llm_model: gpt-4o-2024-08-06  # Large language model for text generation
+  local:
+    api_key: sk-or-v1-1234567890  # API key for local services
+    embedding_url: http://localhost:8000/v1/  # URL for local embedding service
+    llm_url: http://localhost:8001/v1/  # URL for local LLM service
+    embedding_model: BAAI/bge-multilingual-gemma2  # Local embedding model name
+    llm_model: nemotron  # Local LLM model name
+
+pipeline:
+  max_sources: 10  # Maximum number of sources to take from the web
+  debug: false  # Enable/disable debug mode for detailed logging
+  log_dir: logs  # Directory where pipeline logs are stored
+
+query_enhancer:
+  max_queries: 3  # Maximum number of enhanced queries to generate
+  verbose: ${VERBOSE}  # Enable detailed logging for query enhancement process
+
+search_provider:
+  verbose: ${VERBOSE}  # Enable detailed logging for search operations
+  instance_url: http://localhost:5555/search
+
+quality_improver:
+  verbose: ${VERBOSE}  # Enable detailed logging for quality improvement
+
+web_scraper:
+  strategies: 
+    - lukas  # List of scraping strategies to use
+  debug: ${VERBOSE}  # Enable debug mode for scraping operations
+  filter_content: false  # Whether to filter scraped content
+
+chunker:
+  verbose: ${VERBOSE}  # Enable detailed logging for text chunking
+  chunk_size: 1000  # Size of each text chunk in characters
+  chunk_overlap: 100  # Number of overlapping characters between chunks
+
+embedder:
+  verbose: ${VERBOSE}  # Enable detailed logging for embedding generation
+  max_tokens: 4096  # Maximum number of tokens to process at once
+  batch_size: 50  # Number of texts to embed in a single batch
+
+retriever:
+  verbose: ${VERBOSE}  # Enable detailed logging for retrieval operations
+  top_k: 50  # Number of top candidates to retrieve for reranking
+
+reranker:
+  verbose: ${VERBOSE}  # Enable detailed logging for reranking process
+  top_k: 10  # Number of top results to keep after reranking
+  batch_size: 16  # Number of candidates to rerank in a single batch
+  max_length: 1024  # Maximum text length for reranking
+
+context_builder:
+  verbose: ${VERBOSE}  # Enable detailed logging for context building
+
+llm_provider:
+  verbose: ${VERBOSE}  # Enable detailed logging for LLM operations 

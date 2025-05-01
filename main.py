@@ -5,10 +5,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["VERBOSE"] = "True"
 verbose = os.environ["VERBOSE"] == "True"
 
-
+import yaml
 from typing import Dict, List, Any, Optional
 import asyncio
-
 import openai
 
 from rag_search.scraping.quality_scorer import QualityImprover
@@ -17,24 +16,21 @@ from rag_search.processing.llm_query_enhancer import LLMQueryEnhancer
 from rag_search.processing.retriever import CosineRetriever, Retriever
 from rag_search.processing.reranker import JinaAIReranker, Reranker
 
-
-# Configuration parameters with descriptions
+# Default configuration as a fallback
 CONFIG = {
     "api": {
-        # OpenAI API configuration for cloud-based services
         "openai": {
-            "api_key": os.getenv("OPENAI_API_KEY"),      # OpenAI API key from environment variables
-            "api_url": "https://api.openai.com/v1",      # Base URL for OpenAI API endpoints
-            "embedding_model": "text-embedding-3-small",  # Model used for text embeddings
-            "llm_model": "gpt-4o-2024-08-06"            # Large language model for text generation
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "api_url": "https://api.openai.com/v1",
+            "embedding_model": "text-embedding-3-small",
+            "llm_model": "gpt-4o-2024-08-06"
         },
-        # Local API configuration for self-hosted services
         "local": {
-            "api_key": "sk-or-v1-1234567890",           # API key for local services
-            "embedding_url": "http://localhost:8000/v1/", # URL for local embedding service
-            "llm_url": "http://localhost:8001/v1/",      # URL for local LLM service
-            "embedding_model": "BAAI/bge-multilingual-gemma2", # Local embedding model name
-            "llm_model": "nemotron"                      # Local LLM model name
+            "api_key": "sk-or-v1-1234567890",
+            "embedding_url": "http://localhost:8000/v1/",
+            "llm_url": "http://localhost:8001/v1/",
+            "embedding_model": "BAAI/bge-multilingual-gemma2",
+            "llm_model": "nemotron"
         }
     },
     "pipeline": {
@@ -47,12 +43,16 @@ CONFIG = {
         "verbose": verbose        # Enable detailed logging for query enhancement process
     },
     "search_provider": {
-        "verbose": verbose        # Enable detailed logging for search operations
+        "verbose": verbose,        # Enable detailed logging for search operations
+        "instance_url": "http://localhost:5555/search"
     },
     "web_scraper": {
         "strategies": ["lukas"],  # List of scraping strategies to use
         "debug": verbose,            # Enable debug mode for scraping operations
         "filter_content": False   # Whether to filter scraped content
+    },
+    "quality_improver": {
+        "verbose": verbose,          # Enable detailed logging for quality improvement
     },
     "chunker": {
         "verbose": verbose,          # Enable detailed logging for text chunking
@@ -82,25 +82,47 @@ CONFIG = {
     }
 }
 
-def get_api_config(use_openai: bool = False) -> Dict[str, str]:
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Load configuration from YAML file or use default CONFIG."""
+    if config_path and os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            
+            # Replace environment variables
+            def replace_env_vars(obj):
+                if isinstance(obj, dict):
+                    return {k: replace_env_vars(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [replace_env_vars(item) for item in obj]
+                elif isinstance(obj, str) and obj.startswith('${') and obj.endswith('}'):
+                    env_var = obj[2:-1]
+                    return os.getenv(env_var, obj)
+                return obj
+            
+            return replace_env_vars(config)
+    return CONFIG
+
+def get_api_config(config: Dict[str, Any], use_openai: bool = False) -> Dict[str, str]:
     """Get API configuration based on whether using OpenAI or local endpoints."""
+    api_section = config["api"]["openai"] if use_openai else config["api"]["local"]
+    
     if use_openai:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable must be set when use_openai=True")
         return {
             "api_key": api_key,
-            "embedding_url": CONFIG["api"]["openai"]["api_url"],
-            "llm_url": CONFIG["api"]["openai"]["api_url"],
-            "embedding_model": CONFIG["api"]["openai"]["embedding_model"],
-            "llm_model": CONFIG["api"]["openai"]["llm_model"]
+            "embedding_url": api_section["api_url"],
+            "llm_url": api_section["api_url"],
+            "embedding_model": api_section["embedding_model"],
+            "llm_model": api_section["llm_model"]
         }
     return {
-        "api_key": CONFIG["api"]["local"]["api_key"],
-        "embedding_url": CONFIG["api"]["local"]["embedding_url"],
-        "llm_url": CONFIG["api"]["local"]["llm_url"],
-        "embedding_model": CONFIG["api"]["local"]["embedding_model"],
-        "llm_model": CONFIG["api"]["local"]["llm_model"]
+        "api_key": api_section["api_key"],
+        "embedding_url": api_section["embedding_url"],
+        "llm_url": api_section["llm_url"],
+        "embedding_model": api_section["embedding_model"],
+        "llm_model": api_section["llm_model"]
     }
 
 from rag_search.llm.openai_provider import OpenAIProvider
@@ -526,11 +548,18 @@ If you cannot find the answer in the context, say so - do not make up informatio
 
 
 if __name__ == "__main__":
-    # Flag to control whether to use OpenAI or local endpoints
-    use_openai = True  # Set to True to use OpenAI's API
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='RAG Search Pipeline')
+    parser.add_argument('--config', type=str, help='Path to YAML configuration file')
+    parser.add_argument('--use-openai', action='store_true', help='Use OpenAI API instead of local endpoints')
+    args = parser.parse_args()
 
+    # Load configuration
+    config = load_config(args.config)
+    
     # Get unified API configuration
-    api_config = get_api_config(use_openai)
+    api_config = get_api_config(config, args.use_openai)
 
     # Initialize OpenAI clients using unified configuration
     embeding_client = openai.OpenAI(
@@ -545,53 +574,60 @@ if __name__ == "__main__":
     query_enhancer = LLMQueryEnhancer(
         openai_client=llm_client,
         model=api_config["llm_model"],
-        max_queries=CONFIG["query_enhancer"]["max_queries"],
-        verbose=CONFIG["query_enhancer"]["verbose"]
+        max_queries=config["query_enhancer"]["max_queries"],
+        verbose=config["query_enhancer"]["verbose"]
     )
     
-    search_provider = SearXNGProvider(verbose=CONFIG["search_provider"]["verbose"])
-    quality_improver = QualityImprover(verbose=True)
+    search_provider = SearXNGProvider(
+        verbose=config["search_provider"]["verbose"],
+        instance_url=config["search_provider"]["instance_url"]
+    )
+    quality_improver = QualityImprover(verbose=config["quality_improver"]["verbose"])
     web_scraper = WebScraper(
-        strategies=CONFIG["web_scraper"]["strategies"],
-        debug=CONFIG["web_scraper"]["debug"], 
+        strategies=config["web_scraper"]["strategies"],
+        debug=config["web_scraper"]["debug"], 
         llm_base_url=api_config["llm_url"],
-        filter_content=CONFIG["web_scraper"]["filter_content"],
+        filter_content=config["web_scraper"]["filter_content"],
         user_query=None, 
         quality_improver=quality_improver
     )
 
-    chunker = Chunker(verbose=CONFIG["chunker"]["verbose"],chunk_size=CONFIG["chunker"]["chunk_size"],chunk_overlap=CONFIG["chunker"]["chunk_overlap"])
+    chunker = Chunker(
+        verbose=config["chunker"]["verbose"],
+        chunk_size=config["chunker"]["chunk_size"],
+        chunk_overlap=config["chunker"]["chunk_overlap"]
+    )
 
     # Initialize embedder for initial retrieval
     embedder = OpenAIEmbedder(
         openai_client=embeding_client,
         model_name=api_config["embedding_model"],
-        verbose=CONFIG["embedder"]["verbose"],
-        max_tokens=CONFIG["embedder"]["max_tokens"],
-        batch_size=CONFIG["embedder"]["batch_size"]
+        verbose=config["embedder"]["verbose"],
+        max_tokens=config["embedder"]["max_tokens"],
+        batch_size=config["embedder"]["batch_size"]
     )
     
     # Initialize retriever for first stage
     retriever = CosineRetriever(
         embedder=embedder, 
-        verbose=CONFIG["retriever"]["verbose"],
-        top_k=CONFIG["retriever"]["top_k"]  # Get more candidates for reranking
+        verbose=config["retriever"]["verbose"],
+        top_k=config["retriever"]["top_k"]
     )
     
     # Initialize reranker for second stage
     reranker = JinaAIReranker(
-        verbose=CONFIG["reranker"]["verbose"],
-        top_k=CONFIG["reranker"]["top_k"],  # Final number of results
-        batch_size=CONFIG["reranker"]["batch_size"],
-        max_length=CONFIG["reranker"]["max_length"]
+        verbose=config["reranker"]["verbose"],
+        top_k=config["reranker"]["top_k"],
+        batch_size=config["reranker"]["batch_size"],
+        max_length=config["reranker"]["max_length"]
     )
     
-    context_builder = LukaContextBuilder(verbose=CONFIG["context_builder"]["verbose"])
+    context_builder = LukaContextBuilder(verbose=config["context_builder"]["verbose"])
     llm_provider = OpenAIProvider(
         model=api_config["llm_model"],
         api_key=api_config["api_key"],
         api_base=api_config["llm_url"],
-        verbose=CONFIG["llm_provider"]["verbose"]
+        verbose=config["llm_provider"]["verbose"]
     )
 
     # Initialize pipeline with both retriever and reranker
@@ -600,13 +636,13 @@ if __name__ == "__main__":
         web_scraper=web_scraper,
         chunker=chunker,
         embedder=embedder,
-        retriever=retriever,  # First stage retrieval
-        reranker=reranker,  # Second stage reranking
+        retriever=retriever,
+        reranker=reranker,
         context_builder=context_builder,
         llm_provider=llm_provider,
         query_enhancer=query_enhancer,
-        max_sources=CONFIG["pipeline"]["max_sources"],
-        debug=CONFIG["pipeline"]["debug"]
+        max_sources=config["pipeline"]["max_sources"],
+        debug=config["pipeline"]["debug"]
     )
     
     # Run pipeline in continuous chat mode
