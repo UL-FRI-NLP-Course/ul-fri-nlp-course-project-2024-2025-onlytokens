@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "rag_search"
 version = "0.1.0"
 description = "RAG Search implementation"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "annotated-types",
     "anyio",
