@@ -95,7 +95,7 @@ class WebScraper:
         llm_base_url: str = "https://localhost:8001/v1/",
         quality_improver: Optional[QualityImprover] = None
     ):
-        self.browser_config = browser_config or BrowserConfig(headless=True, verbose=True)
+        self.browser_config = browser_config or BrowserConfig(headless=True, verbose=False)
         self.debug = debug
         self.factory = StrategyFactory()
         self.strategies = strategies

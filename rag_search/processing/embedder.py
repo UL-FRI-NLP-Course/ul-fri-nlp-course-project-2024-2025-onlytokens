@@ -366,8 +366,13 @@ class OpenAIEmbedder(Embedder):
         self.batch_size = batch_size
         self.embedding_dim = 3584  # BGE model dimension
         
-        # Initialize tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Initialize tokenizer based on model
+        if  "text-embedding" in model_name:
+            log_info("Using tiktoken for OpenAI models", "OpenAIEmbedder")
+            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+            self.embedding_dim = 1536  # text-embedding-3-small dimension
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         
         if self.verbose:
             log_operation_start("INITIALIZE EMBEDDER", "OpenAIEmbedder")
@@ -391,13 +396,21 @@ class OpenAIEmbedder(Embedder):
             return ""
         
         try:
-            encoded = self.tokenizer(
-                text,
-                truncation=True,
-                max_length=self.max_tokens,
-                return_tensors='pt'
-            )
-            return self.tokenizer.decode(encoded['input_ids'][0])
+            if self.model_name == "text-embedding-3-small":
+                # Use tiktoken for OpenAI models
+                tokens = self.tokenizer.encode(text)
+                if len(tokens) > self.max_tokens:
+                    tokens = tokens[:self.max_tokens]
+                return self.tokenizer.decode(tokens)
+            else:
+                # Use AutoTokenizer for other models
+                encoded = self.tokenizer(
+                    text,
+                    truncation=True,
+                    max_length=self.max_tokens,
+                    return_tensors='pt'
+                )
+                return self.tokenizer.decode(encoded['input_ids'][0])
         except Exception as e:
             if self.verbose:
                 log_error(f"Error truncating text: {str(e)}", "OpenAIEmbedder")
