@@ -131,8 +131,8 @@ class OpenAIProvider(LLMProvider):
             # Log final chunk marker if verbose
             if self.verbose and not is_first:  # Only if we output something
                 log_stream_chunk("", "LLM", is_first=False, is_last=True)
-                log_success(f"Generated {len(''.join(collected_chunks))} chars", "LLM")
-                log_operation_end("GENERATING STREAMING RESPONSE", "LLM")
+                #log_success(f"Generated {len(''.join(collected_chunks))} chars", "LLM")
+                #log_operation_end("GENERATING STREAMING RESPONSE", "LLM")
                 
         except Exception as e:
             if self.verbose:

@@ -390,45 +390,33 @@ class LukaContextBuilder(ContextBuilder):
         if self.verbose:
             log_info("Context builder ready!", "LukaContextBuilder")
 
-    def _get_prompt_template(self) -> str:
-        """Get the prompt template for the LLM."""
-        return '''### Query:
-{query}
-
-### Context:
-<context>
-{context}
-</context>
-
-### Instructions:
-You are a helpful AI assistant. Answer the query naturally and conversationally using the provided context.
+    def _get_system_instructions(self) -> str:
+        """Get the system instructions for the LLM."""
+        return """You are a helpful AI assistant. Answer the user's questions based on the provided context.
 - Use information from the context to support your answer
 - Cite sources using [1], [2] etc. when referencing specific information
 - Be concise and direct
 - If you're not sure about something, say so
 - If the context doesn't help answer the query, use your own knowledge but mention this
 - Respond in the same language as the query
-- Focus on being helpful rather than explaining your citations
-
-Example of good response style:
-"John Smith is a software engineer at Google [1] who specializes in machine learning. He previously worked at Microsoft [2] and has published several papers on AI safety."
-
-### Response:'''
+- Focus on being helpful rather than explaining your citations"""
 
     def build(
         self,
         processed_content: List[Dict[str, Any]],
-        search_results: Dict[str, Any]
-    ) -> str:
+        search_results: Dict[str, Any],
+        query: str = None
+    ) -> Dict[str, Any]:
         """
         Build context from processed content and search results using Luka formatting.
         
         Args:
             processed_content: List of processed content chunks
             search_results: Original search results (not used)
+            query: The user's query
             
         Returns:
-            Formatted context string with XML tags and prompting instructions
+            Dictionary containing messages for the LLM
         """
         if self.verbose:
             log_operation_start("BUILDING CONTEXT", "LukaContextBuilder")
@@ -469,13 +457,25 @@ Example of good response style:
         context = "\n\n".join(context_parts)
         
         if self.verbose:
-            log_success("prompt built successfully", "LukaContextBuilder")
+            log_success("Context built successfully", "LukaContextBuilder")
             log_output(f"Context with {len(context)} characters", "LukaContextBuilder")
             log_operation_end("BUILDING CONTEXT", "LukaContextBuilder")
 
-        # Get the prompt template and format with context
-        prompt_template = self._get_prompt_template()
-        return prompt_template.format(
-            context=context,
-            query="{query}"  # This will be replaced by the actual query later
-        )
+        # Format the context message
+        context_message = f"""### Context:
+<context>
+{context}
+</context>"""
+
+        # Add query if provided
+        if query:
+            context_message = f"""### Query:
+{query}
+
+{context_message}"""
+
+        # Return messages dictionary
+        return {
+            "system": self._get_system_instructions(),
+            "context": context_message
+        }
