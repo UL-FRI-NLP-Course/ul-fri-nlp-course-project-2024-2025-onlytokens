@@ -43,6 +43,8 @@ beautifulsoup4==4.13.3
     #   rag-search (pyproject.toml)
     #   bs4
     #   crawl4ai
+brotli==1.1.0
+    # via crawl4ai
 bs4==0.0.2
     # via rag-search (pyproject.toml)
 certifi==2025.1.31
@@ -55,6 +57,8 @@ cffi==1.17.1
     # via
     #   rag-search (pyproject.toml)
     #   cryptography
+chardet==5.2.0
+    # via crawl4ai
 charset-normalizer==3.4.1
     # via
     #   rag-search (pyproject.toml)
@@ -70,7 +74,7 @@ colorama==0.4.6
     # via
     #   rag-search (pyproject.toml)
     #   crawl4ai
-crawl4ai==0.5.0.post8
+crawl4ai==0.6.2
     # via rag-search (pyproject.toml)
 cryptography==44.0.2
     # via
@@ -99,9 +103,7 @@ fastapi==0.115.12
 fasttext==0.9.3
     # via rag-search (pyproject.toml)
 faust-cchardet==2.1.19
-    # via
-    #   rag-search (pyproject.toml)
-    #   crawl4ai
+    # via rag-search (pyproject.toml)
 filelock==3.18.0
     # via
     #   rag-search (pyproject.toml)

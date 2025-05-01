@@ -313,16 +313,19 @@ class RAGSearchPipeline:
             
             # Get initial candidates using cosine similarity retrieval
             initial_candidates = self.retriever.retrieve(self.embedded_chunks, query)
-            self.logger.log("initial_retrieval", {
-                "num_candidates": len(initial_candidates),
-                "top_candidate_score": initial_candidates[0]['similarity'] if initial_candidates else None,
-                "candidates": [{
-                    "content": c["content"],
-                    "url": c["url"],
-                    "similarity": c["similarity"],
-                    "strategy": c["strategy"]
-                } for c in initial_candidates]  # Log top 10 for reasonable size
-            })
+
+            for candidate in initial_candidates:
+                self.logger.log("initial_retrieval", {
+                    "num_candidates": len(initial_candidates),
+                    "top_candidate_score": initial_candidates[0]['similarity'] if initial_candidates else None,
+                    "candidate": {
+                        "content": candidate['content'],
+                        "url": candidate['url'],
+                        "strategy": candidate['strategy'],
+                        "chunk_index": candidate['chunk_index'],
+                        "total_chunks": candidate['total_chunks']
+                    }
+                })
             
             # Extract just the content and metadata for reranking
             candidates_for_reranking = []
@@ -338,16 +341,12 @@ class RAGSearchPipeline:
             
             # Rerank the candidates using the cross-encoder
             reranked_chunks = self.reranker.rerank(candidates_for_reranking, query)
-            self.logger.log("reranking", {
-                "num_chunks_after_rerank": len(reranked_chunks),
-                "top_chunk_score": reranked_chunks[0]['similarity'] if reranked_chunks else None,
-                "reranked_chunks": [{
-                    "content": c["content"],
-                    "url": c["url"],
-                    "similarity": c["similarity"],
-                    "strategy": c["strategy"]
-                } for c in reranked_chunks]
-            })
+            for chunk in reranked_chunks:
+                self.logger.log("reranking", {
+                    "num_chunks_after_rerank": len(reranked_chunks),
+                    "top_chunk_score": chunk['similarity'] if reranked_chunks else None,
+                    "reranked_chunk": chunk
+                })
             
             return reranked_chunks
         except Exception as e:
@@ -358,16 +357,11 @@ class RAGSearchPipeline:
         """Build context from processed content and search results."""
         try:
             context = self.context_builder.build(processed_content, search_results, query=query)
+
             self.logger.log("context_building", {
-                "context_length": len(context["context"]) if isinstance(context, dict) else len(context),
-                "num_chunks_used": len(processed_content),
-                "context": context,
-                "chunks_used": [{
-                    "content": c["content"],
-                    "url": c["url"],
-                    "similarity": c.get("similarity"),
-                    "strategy": c["strategy"]
-                } for c in processed_content]
+                "num_chunks": len(processed_content),
+                "context": context
+
             })
             
             return context
@@ -411,7 +405,6 @@ If you cannot find the answer in the context, say so - do not make up informatio
             
             self.logger.log("response_generation", {
                 "query": query,
-                "context_length": len(context) if isinstance(context, str) else len(context["context"]),
                 "response_length": len(response),
                 "response": response,
                 "conversation_length": len(self.conversation_history),
@@ -506,8 +499,8 @@ If you cannot find the answer in the context, say so - do not make up informatio
             
             self.logger.log("pipeline_complete", {
                 "query": query,
+                "response": response,
                 "is_followup": is_followup,
-                "response_length": len(response)
             })
                 
             return response
