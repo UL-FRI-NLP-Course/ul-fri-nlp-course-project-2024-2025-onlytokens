@@ -45,7 +45,8 @@ dependencies = [
     "typing-extensions",
     "typing-inspection",
     "urllib3",
-    "uvicorn"
+    "uvicorn",
+    "openai"
 ]
 
 [tool.hatch.build.targets.wheel]
