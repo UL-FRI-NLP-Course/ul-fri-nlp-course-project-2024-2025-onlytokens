@@ -15,7 +15,7 @@ COMPONENT_COLORS = {
     "CrossEncoder": "light_magenta",
     "ContextBuilder": "yellow",
     "OpenAI": "green",
-    "LLM": "black",
+    "LLM": "grey",
     "RAGSearchPipeline": "light_magenta",
     "OpenAIEmbedder": "light_magenta",
     "LukaContextBuilder": "light_yellow",
