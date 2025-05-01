@@ -91,9 +91,10 @@ class WebScraper:
         llm_instruction: str = "Extract relevant content from the provided text, only return the text, no markdown formatting, remove all footnotes, citations, and other metadata and only keep the main content",
         user_query: Optional[str] = None,
         debug: bool = False,
-        filter_content: bool = False,
+        enable_quality_model: bool = False,
         llm_base_url: str = "https://localhost:8001/v1/",
-        quality_improver: Optional[QualityImprover] = None
+        quality_improver: Optional[QualityImprover] = None,
+        min_quality_score: float = 0.2
     ):
         self.browser_config = browser_config or BrowserConfig(headless=True, verbose=False)
         self.debug = debug
@@ -101,8 +102,9 @@ class WebScraper:
         self.strategies = strategies
         self.llm_instruction = llm_instruction
         self.user_query = user_query
-        self.filter_content = filter_content
+        self.enable_quality_model = enable_quality_model
         self.quality_improver = quality_improver
+        self.min_quality_score = min_quality_score
         # Validate strategies
         valid_strategies = {'markdown_llm', 'html_llm', 'fit_markdown_llm', 'css', 'xpath', 'no_extraction', 'lukas'}
         invalid_strategies = set(self.strategies) - valid_strategies
@@ -245,19 +247,19 @@ class WebScraper:
 
                         # Save to file for debugging
                         if self.debug:
-                            with open("/Users/carbs/ul-fri-nlp-course-project-2024-2025-onlytokens/contenttt.txt", "w") as f:
+                            with open("source_content_before_quality_model.md", "w") as f:
                                 f.write(content)
                     elif hasattr(result, 'markdown'):
                         content = result.markdown.raw_markdown
                     elif hasattr(result, 'raw_html'):
                         content = result.raw_html
                     
-                    if self.filter_content and content:
-                        content = self.quality_improver.filter_quality_content(content)
+                    if self.enable_quality_model and content:
+                        content = self.quality_improver.filter_quality_content(content, min_quality_score=self.min_quality_score)
                 else:
                     content = result.extracted_content
-                    if self.filter_content and content:
-                        content = self.quality_improver.filter_quality_content(content)
+                    if self.enable_quality_model and content:
+                        content = self.quality_improver.filter_quality_content(content, min_quality_score=self.min_quality_score)
 
             if self.debug:
                 if content:
@@ -266,7 +268,7 @@ class WebScraper:
                     log_error(f"Unable to scrape content from {url}", "WebScraper")
                 #save to file
                 if content:
-                    with open("content.txt", "w") as f:
+                    with open("source_content.md", "w") as f:
                         f.write(content)
             
 
@@ -300,7 +302,7 @@ class WebScraper:
 async def main():
     # Example usage with single URL
     single_url = "https://example.com/product-page"
-    scraper = WebScraper(debug=True, llm_base_url="http://localhost:8001/v1/", filter_content=False)
+    scraper = WebScraper(debug=True, llm_base_url="http://localhost:8001/v1/", enable_quality_model=False)
     results = await scraper.scrape(single_url)
     
     # Print single URL results

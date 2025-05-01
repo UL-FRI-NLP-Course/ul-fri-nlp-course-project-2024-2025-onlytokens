@@ -26,12 +26,13 @@ search_provider:
 
 quality_improver:
   verbose: ${VERBOSE}  # Enable detailed logging for quality improvement
+  enable_quality_model: false
+  min_quality_score: 0.2
 
 web_scraper:
   strategies: 
     - lukas  # List of scraping strategies to use
   debug: ${VERBOSE}  # Enable debug mode for scraping operations
-  filter_content: false  # Whether to filter scraped content
 
 chunker:
   verbose: ${VERBOSE}  # Enable detailed logging for text chunking

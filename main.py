@@ -53,6 +53,8 @@ CONFIG = {
     },
     "quality_improver": {
         "verbose": verbose,          # Enable detailed logging for quality improvement
+        "enable_quality_model": False,
+        "min_quality_score": 0.2
     },
     "chunker": {
         "verbose": verbose,          # Enable detailed logging for text chunking
@@ -587,9 +589,10 @@ if __name__ == "__main__":
         strategies=config["web_scraper"]["strategies"],
         debug=config["web_scraper"]["debug"], 
         llm_base_url=api_config["llm_url"],
-        filter_content=config["web_scraper"]["filter_content"],
         user_query=None, 
-        quality_improver=quality_improver
+        quality_improver=quality_improver,
+        min_quality_score=config["quality_improver"]["min_quality_score"],
+        enable_quality_model=config["quality_improver"]["enable_quality_model"],
     )
 
     chunker = Chunker(
