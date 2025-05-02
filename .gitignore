@@ -134,3 +134,4 @@ logs/*
 # Docker specific
 
 .DS_Store
+eval/results/*

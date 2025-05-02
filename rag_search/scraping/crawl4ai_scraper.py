@@ -246,9 +246,9 @@ class WebScraper:
                             content = str(result.extracted_content)
 
                         # Save to file for debugging
-                        if self.debug:
-                            with open("source_content_before_quality_model.md", "w") as f:
-                                f.write(content)
+                        # if self.debug:
+                        #     with open("source_content_before_quality_model.md", "w") as f:
+                        #         f.write(content)
                     elif hasattr(result, 'markdown'):
                         content = result.markdown.raw_markdown
                     elif hasattr(result, 'raw_html'):
@@ -266,10 +266,10 @@ class WebScraper:
                     log_info(f"Scraped content: {content[:100].strip().replace('\n', ' ').replace('\r', ' ')}", "WebScraper")
                 else:
                     log_error(f"Unable to scrape content from {url}", "WebScraper")
-                #save to file
-                if content:
-                    with open("source_content.md", "w") as f:
-                        f.write(content)
+                # #save to file
+                # if content:
+                #     with open("source_content.md", "w") as f:
+                #         f.write(content)
             
 
             extraction_result = ExtractionResult(

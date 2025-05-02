@@ -59,6 +59,10 @@ uv run main.py --config config.yaml
 ```
 
 
-## Diagram
+# Full Documentation
 
-![Diagram](./docs/diagram.png)
+link to full documentation:
+https://deepwiki.com/TheLukaDragar/super-search
+
+
+

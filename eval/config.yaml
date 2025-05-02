@@ -12,7 +12,7 @@ api:
     llm_model: nemotron  # Local LLM model name
 
 pipeline:
-  max_sources: 10  # Maximum number of sources to take from the web
+  max_sources: 5  # Maximum number of sources to take from the web
   debug: false  # Enable/disable debug mode for detailed logging
   log_dir: logs  # Directory where pipeline logs are stored
 

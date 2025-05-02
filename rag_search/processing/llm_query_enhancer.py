@@ -12,7 +12,7 @@ from rag_search.utils.logging import (
 
 class SearchQueriesResponse(BaseModel):
     """Pydantic model for the LLM response format"""
-    queries: List[str] 
+    queries: List[str] = Field(description="List of search queries")
 
 @dataclass
 class EnhancedQueries:
@@ -74,7 +74,22 @@ You must respond with valid JSON matching the specified schema."""
 User Query: {query}
 
 Generate queries that will help find the most relevant, comprehensive, and up-to-date information to answer this query.
-Focus on creating diverse queries that cover different aspects while maintaining relevance to the original intent."""
+Focus on creating diverse queries that cover different aspects while maintaining relevance to the original intent.
+
+Example:
+
+Question: What is the capital of Slovenia?
+
+Response:
+{{
+    "queries": [
+        "capital of Slovenia",
+        "Slovenia main city",
+    ]
+}}
+
+
+"""
 
     async def enhance(self, query: str) -> EnhancedQueries:
         """
@@ -91,15 +106,27 @@ Focus on creating diverse queries that cover different aspects while maintaining
             log_input(query, "LLMQueryEnhancer")
         
         try:
-            response = self.client.beta.chat.completions.parse(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": self._get_user_prompt(query)}
-                ],
-                response_format=SearchQueriesResponse
-            )
-                        
+            if self.model == "nemotron":
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": self._get_system_prompt()},
+                        {"role": "user", "content": self._get_user_prompt(query)}
+                    ],
+                    temperature=0.1,
+                    extra_body={"guided_json": SearchQueriesResponse.model_json_schema()},
+                    max_tokens=1000
+                )
+            else:
+                response = self.client.beta.chat.completions.parse(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": self._get_system_prompt()},
+                        {"role": "user", "content": self._get_user_prompt(query)}
+                    ],
+                    response_format=SearchQueriesResponse,
+                    max_tokens=1000
+                )
             # Parse the response
             content = response.choices[0].message.content
             queries_response = SearchQueriesResponse.model_validate_json(content)

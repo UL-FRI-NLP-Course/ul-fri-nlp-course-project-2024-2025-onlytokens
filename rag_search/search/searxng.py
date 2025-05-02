@@ -150,8 +150,9 @@ class SearXNGProvider(SearchProvider):
         # Extract organic results
         organic_results = []
         #SAVE RESULTS TO A FILE
-        with open('search_results.json', 'w') as f:
-            json.dump(data, f)
+        # if self.verbose:
+        #     with open('search_results.json', 'w') as f:
+        #         json.dump(data, f)
         for result in data.get('results', [])[:num_results]:
             organic_results.append({
                 'title': result.get('title', ''),

@@ -1,8 +1,9 @@
 # Set tokenizers parallelism to avoid deadlocks with fork
+import json
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 #set environ
-os.environ["VERBOSE"] = "True"
+# os.environ["VERBOSE"] = "True"
 verbose = os.environ["VERBOSE"] == "True"
 
 import yaml
@@ -15,6 +16,10 @@ from rag_search.utils.pipeline_logger import PipelineLogger
 from rag_search.processing.llm_query_enhancer import LLMQueryEnhancer
 from rag_search.processing.retriever import CosineRetriever, Retriever
 from rag_search.processing.reranker import JinaAIReranker, Reranker
+
+from transformers import AutoTokenizer
+import tiktoken
+
 
 # Default configuration as a fallback
 CONFIG = {
@@ -161,6 +166,10 @@ class RAGSearchPipeline:
         # Initialize logger first
         self.logger = PipelineLogger(log_dir=log_dir)
         
+        # Initialize tokenizers
+        self.nemotron_tokenizer = AutoTokenizer.from_pretrained("nvidia/Llama-3.1-Nemotron-70B-Instruct-HF")
+        self.tiktoken_encoder = tiktoken.get_encoding("cl100k_base")
+        
         # Pass logger to components that support it
         embedder.pipeline_logger = self.logger
         retriever.pipeline_logger = self.logger
@@ -295,14 +304,14 @@ class RAGSearchPipeline:
                     ]
                 })
 
-            # Save to nice markdown file
-            with open("debug_save.md", "w") as f:
-                for url, strategies in debug_save.items():
-                    f.write(f"# URL: {url}\n\n")
-                    for strategy_name, result in strategies.items():
-                        f.write(f"## Strategy: {strategy_name} (Success: {result['success']})\n\n")
-                        f.write(result['content'])
-                        f.write("\n\n---\n\n")
+            # # Save to nice markdown file
+            # with open("debug_save.md", "w") as f:
+            #     for url, strategies in debug_save.items():
+            #         f.write(f"# URL: {url}\n\n")
+            #         for strategy_name, result in strategies.items():
+            #             f.write(f"## Strategy: {strategy_name} (Success: {result['success']})\n\n")
+            #             f.write(result['content'])
+            #             f.write("\n\n---\n\n")
 
             # Embed chunks and store for later use
             self.embedded_chunks = self.embedder.embed_chunks(all_chunks)
@@ -319,7 +328,7 @@ class RAGSearchPipeline:
                     "num_candidates": len(initial_candidates),
                     "top_candidate_score": initial_candidates[0]['similarity'] if initial_candidates else None,
                     "candidate": {
-                        "content": candidate['content'],
+                        "content": json.dumps(candidate['content']),
                         "url": candidate['url'],
                         "strategy": candidate['strategy'],
                         "chunk_index": candidate['chunk_index'],
@@ -353,15 +362,84 @@ class RAGSearchPipeline:
             self.logger.log_error("process_content", e)
             raise
     
+    def _balance_chunks_by_tokens(
+        self,
+        chunks: List[Dict[str, Any]],
+        max_total_tokens: int = 100000,  # Safe default below 131072
+        model: str = "gpt-4"
+    ) -> List[Dict[str, Any]]:
+        """
+        Balance chunks by tokens to fit within context window.
+        
+        Args:
+            chunks: List of content chunks
+            max_total_tokens: Maximum total tokens allowed
+            model: Model name for tokenization
+            
+        Returns:
+            List of balanced chunks
+        """
+        try:
+            # Select appropriate tokenizer based on model
+            if "nemotron" in model.lower():
+                encode_func = lambda x: self.nemotron_tokenizer.encode(x, add_special_tokens=False)
+                decode_func = lambda x: self.nemotron_tokenizer.decode(x)
+            else:
+                # Default to tiktoken for OpenAI models
+                encode_func = lambda x: self.tiktoken_encoder.encode(x)
+                decode_func = lambda x: self.tiktoken_encoder.decode(x)
+            
+            # Calculate tokens for each chunk
+            chunk_tokens = []
+            for chunk in chunks:
+                content = chunk.get('content', '')
+                tokens = len(encode_func(content))
+                chunk_tokens.append(tokens)
+                
+            total_tokens = sum(chunk_tokens)
+            
+            if total_tokens <= max_total_tokens:
+                return chunks
+            
+            log_info(f"context window is too large, balancing chunks", "RAGSearchPipeline")
+                
+            # Calculate target tokens per chunk
+            num_chunks = len(chunks)
+            target_tokens_per_chunk = max_total_tokens // num_chunks
+            log_info(f"target tokens per chunk: {target_tokens_per_chunk} on {num_chunks} chunks", "RAGSearchPipeline")
+            
+            # Balance chunks
+            balanced_chunks = []
+            for chunk, tokens in zip(chunks, chunk_tokens):
+                content = chunk.get('content', '')
+                if tokens > target_tokens_per_chunk:
+                    # Truncate content to target length
+                    encoded = encode_func(content)
+                    truncated = decode_func(encoded[:target_tokens_per_chunk])
+                    new_chunk = dict(chunk)
+                    new_chunk['content'] = truncated
+                    balanced_chunks.append(new_chunk)
+                else:
+                    balanced_chunks.append(chunk)
+                    
+            return balanced_chunks
+            
+        except Exception as e:
+            self.logger.log_error("chunk_balancing", e)
+            # If tokenization fails, return original chunks
+            return chunks
+            
     def build_context(self, processed_content: List[Dict[str, Any]], search_results: Dict[str, Any], query: str) -> Dict[str, Any]:
         """Build context from processed content and search results."""
         try:
-            context = self.context_builder.build(processed_content, search_results, query=query)
+            # Balance chunks by tokens before building context
+            balanced_content = self._balance_chunks_by_tokens(processed_content)
+            
+            context = self.context_builder.build(balanced_content, search_results, query=query)
 
             self.logger.log("context_building", {
-                "num_chunks": len(processed_content),
-                "context": context
-
+                "num_chunks": len(balanced_content),
+                "context": json.dumps(context, ensure_ascii=False).encode('utf-8').decode('unicode-escape')
             })
             
             return context
@@ -380,10 +458,8 @@ class RAGSearchPipeline:
                 # New format from LukaContextBuilder
                 messages.append({"role": "system", "content": context["system"]})
             else:
-                # Legacy format or simple string context
-                system_prompt = """You are a helpful AI assistant. Answer the user's questions based on the provided context.
-If you cannot find the answer in the context, say so - do not make up information."""
-                messages.append({"role": "system", "content": system_prompt})
+                raise ValueError("Invalid context format")
+                exit()
             
             # Add conversation history
             for msg in self.conversation_history:
@@ -502,10 +578,18 @@ If you cannot find the answer in the context, say so - do not make up informatio
                 "response": response,
                 "is_followup": is_followup,
             })
+            
+            # Save logs before clearing
+            self.logger.save_logs()
+            # Clear logs after request is complete
+            self.logger.clear_logs()
                 
             return response
         except Exception as e:
+            # Log error and save logs before clearing
             self.logger.log_error("pipeline_run", e, {"query": query})
+            self.logger.save_logs()
+            self.logger.clear_logs()
             raise
     
     def run_sync(self, query: str) -> str:
