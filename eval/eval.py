@@ -418,7 +418,7 @@ def main():
 
 if __name__ == "__main__":
     #start debugpy
-    debugpy.listen(5678)
-    print("Waiting for client to attach...")
-    debugpy.wait_for_client()
+    # debugpy.listen(5678)
+    # print("Waiting for client to attach...")
+    # debugpy.wait_for_client()
     main()

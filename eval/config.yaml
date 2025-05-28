@@ -26,8 +26,8 @@ search_provider:
 
 quality_improver:
   verbose: ${VERBOSE}  # Enable detailed logging for quality improvement
-  enable_quality_model: false
-  min_quality_score: 0.2
+  enable_quality_model: true
+  min_quality_score: 1
 
 web_scraper:
   strategies: 
