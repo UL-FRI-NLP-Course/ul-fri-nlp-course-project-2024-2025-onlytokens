@@ -22,6 +22,12 @@ install dependencies
 uv sync
 ```
 
+install/update browser engine for playwright
+
+```
+uv run python -m  playwright install  
+```
+
 ### Start SearXNG
 
 1. Navigate to the SearXNG directory:

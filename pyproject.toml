@@ -73,6 +73,7 @@ dependencies = [
     "pandas>=2.2.3",
     "pillow==10.4.0",
     "playwright==1.51.0",
+    "plotly>=6.1.2",
     "propcache==0.3.1",
     "psutil==7.0.0",
     "pybind11==2.13.6",
@@ -127,3 +128,22 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["rag_search"]
+
+[tool.pyrefly]
+# Configure Pyrefly to use the virtual environment
+python_interpreter = ".venv/bin/python"
+# Let Pyrefly auto-configure site_package_path from the interpreter
+# But we can also explicitly set it if needed:
+# site_package_path = [".venv/lib/python3.13/site-packages"]
+
+# Include the main project files
+project_includes = ["**/*.py"]
+# Exclude common patterns that shouldn't be type checked
+project_excludes = ["**/.[!/.]*", "**/*venv/**", "**/node_modules/**"]
+
+# Set search path for project imports
+search_path = ["."]
+
+# Enable checking untyped imports from site packages
+use_untyped_imports = true
+ignore_missing_source = true

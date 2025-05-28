@@ -43,13 +43,14 @@ class PipelineEvaluator:
         test_set_path: str,
         results_dir: str,
         use_openai: bool = True,
-        restore_run_id: str = None
+        restore_run_id: Optional[str] = None
     ):
         self.config_path = config_path
         self.test_set_path = test_set_path
         self.results_dir = Path(results_dir)
         self.use_openai = use_openai
         self.restore_run_id = restore_run_id
+        self.config: Dict[str, Any] = {}  # Initialize config attribute
         
         # Create results directory if it doesn't exist
         self.results_dir.mkdir(parents=True, exist_ok=True)

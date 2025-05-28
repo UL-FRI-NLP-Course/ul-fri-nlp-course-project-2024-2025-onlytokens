@@ -90,10 +90,10 @@ C: NOT_ATTEMPTED
 Just return the letters "A", "B", or "C", with no text around it.
 """.strip()
 
-def grade_row_gpt4o(row_data):
+def grade_row_llm(row_data):
     idx, row = row_data
     question = row['question']
-    predicted_answer = row['pipeline_answer']
+    predicted_answer = row['pipeline_answer'] if 'pipeline_answer' in row else row['llm_answer']
     gold_answer = row['true_answer']
     
     input_prompt = GRADER_TEMPLATE.format(
@@ -119,7 +119,7 @@ def grade_row_gpt4o(row_data):
 def grade_row(row_data):
     idx, row = row_data
     question = row['question']
-    predicted_answer = row['pipeline_answer']
+    predicted_answer = row['pipeline_answer'] if 'pipeline_answer' in row else row['llm_answer']
     gold_answer = row['true_answer']
 
     if gold_answer.lower() in predicted_answer.lower():
@@ -128,9 +128,9 @@ def grade_row(row_data):
         return idx, 0
     
 
-def autograde_df(df_path, num_cpus=4):
+def autograde_df(raw_results_path, output_path, num_cpus=4):
     # Read the dataframe
-    df = pd.read_json(df_path, lines=True)
+    df = pd.read_json(raw_results_path, lines=True)
     
     # Prepare data for parallel processing
     row_data = list(df.iterrows())
@@ -145,7 +145,7 @@ def autograde_df(df_path, num_cpus=4):
     with Pool(n_processes) as pool:
         # Use tqdm for progress bar
         results = list(tqdm(
-            pool.imap(grade_row_gpt4o, row_data),
+            pool.imap(grade_row_llm, row_data),
             total=len(row_data),
             desc="Grading"
         ))
@@ -173,7 +173,7 @@ def autograde_df(df_path, num_cpus=4):
     df['final_grade'] = final_grades
     
     # Save the updated dataframe back to the same file
-    df.to_json("/Users/carbs/ul-fri-nlp-course-project-2024-2025-onlytokens/eval/gpt4o_results.jsonl", orient='records', lines=True)
+    df.to_json(output_path, orient='records', lines=True)
 
 
     #SET A to 1, B to 0, C to 0
@@ -191,8 +191,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Auto-grade answers in a DataFrame')
     #parser.add_argument('df_path', type=str, help='Path to the DataFrame JSON file')
     parser.add_argument('--num_cpus', type=int, default=4, help='Number of CPU cores to use')
-
-    df_path = "/Users/carbs/ul-fri-nlp-course-project-2024-2025-onlytokens/eval/results/eval_run_87ed45c3-864a-4388-a66a-e9d88741fb1d/results.jsonl"
-    
+    parser.add_argument('--raw_results_path', type=str, default="./results/eval_run_87ed45c3-864a-4388-a66a-e9d88741fb1d/results.jsonl", help='Path to the raw results')
     args = parser.parse_args()
-    autograde_df(df_path, args.num_cpus)
+
+    #place output next to raw results
+    output_path = os.path.join(os.path.dirname(args.raw_results_path), f"llm_graded_results_{os.path.basename(args.raw_results_path)}")
+
+    autograde_df(args.raw_results_path, output_path, args.num_cpus)
