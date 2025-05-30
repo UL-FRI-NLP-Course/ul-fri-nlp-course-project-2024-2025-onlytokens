@@ -6,8 +6,8 @@ api:
     llm_model: gpt-4o-2024-08-06  # Large language model for text generation
   local:
     api_key: sk-or-v1-1234567890  # API key for local services
-    embedding_url: http://localhost:8006/v1  # URL for local embedding service
-    llm_url: http://localhost:8005/v1  # URL for local LLM service
+    embedding_url:  https://analysts-coordinated-tobago-halo.trycloudflare.com/v1  # URL for local embedding service
+    llm_url:  https://intensive-cod-stolen-significantly.trycloudflare.com/v1  # URL for local LLM service
     embedding_model: BAAI/bge-multilingual-gemma2  # Local embedding model name
     llm_model: nemotron  # Local LLM model name
 
@@ -27,7 +27,7 @@ search_provider:
 quality_improver:
   verbose: ${VERBOSE}  # Enable detailed logging for quality improvement
   enable_quality_model: false
-  min_quality_score: 0.2
+  min_quality_score: 1
 
 web_scraper:
   strategies: 

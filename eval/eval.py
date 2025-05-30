@@ -186,21 +186,42 @@ class PipelineEvaluator:
     def load_test_set(self) -> List[Dict[str, Any]]:
         """Load test cases from CSV file."""
         test_cases = []
-        with open(self.test_set_path, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # Parse metadata string to dict
-                try:
-                    metadata = json.loads(row['metadata'].replace("'", '"'))
-                except:
-                    metadata = {}
+        
+        # Try different encodings to handle Unicode issues
+        encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings_to_try:
+            try:
+                with open(self.test_set_path, 'r', encoding=encoding) as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # Parse metadata string to dict
+                        try:
+                            metadata = json.loads(row['metadata'].replace("'", '"'))
+                        except:
+                            metadata = {}
+                        
+                        test_case = {
+                            'metadata': metadata,
+                            'question': row['question'],
+                            'true_answer': row['true_answer']
+                        }
+                        test_cases.append(test_case)
                 
-                test_case = {
-                    'metadata': metadata,
-                    'question': row['question'],
-                    'true_answer': row['true_answer']
-                }
-                test_cases.append(test_case)
+                print(f"Successfully loaded {len(test_cases)} test cases using {encoding} encoding")
+                break  # If successful, break out of the loop
+                
+            except UnicodeDecodeError as e:
+                print(f"Failed to read with {encoding} encoding: {e}")
+                test_cases = []  # Reset for next attempt
+                continue
+            except Exception as e:
+                print(f"Error reading file with {encoding} encoding: {e}")
+                test_cases = []  # Reset for next attempt
+                continue
+        
+        if not test_cases:
+            raise ValueError(f"Could not read CSV file with any of the attempted encodings: {encodings_to_try}")
 
         #keep to 5
         return test_cases
@@ -226,10 +247,12 @@ class PipelineEvaluator:
             
             try:
                 # Run pipeline on test question
+
                 response = await self.pipeline.run(test_case['question'])
                 
                 # Get logs from memory before restoring log clearing
                 pipeline_logs = self.pipeline.logger.get_logs()
+
                 
                 # Extract relevant information from logs
                 enhanced_queries = next((log['data']['enhanced_queries'] for log in pipeline_logs if log['stage'] == 'query_enhancement'), [])

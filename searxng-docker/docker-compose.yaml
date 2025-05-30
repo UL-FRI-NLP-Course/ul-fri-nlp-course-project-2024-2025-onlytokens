@@ -54,6 +54,7 @@ services:
       - "127.0.0.1:5555:8080"
     volumes:
       - ./searxng:/etc/searxng:rw
+      - ./currencies_fixed.py:/usr/local/searxng/searx/data/currencies.py:ro
     environment:
       - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
       - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
