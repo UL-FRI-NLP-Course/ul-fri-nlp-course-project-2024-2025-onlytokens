@@ -57,7 +57,7 @@
 %----------------------------------------------------------------------------------------  
   
 \Abstract{  
-This project implements an advanced conversational agent that leverages Retrieval-Augmented Generation (RAG) to enhance response quality and factual accuracy. Unlike traditional chatbots relying solely on pre-trained knowledge, our system incorporates real-time web scraping capabilities to retrieve up-to-date information from the internet. By dynamically fetching and integrating external information during conversation, the agent provides more accurate, comprehensive, and current responses. Our implementation features a modular pipeline architecture that includes query enhancement, web search via SearXNG, content extraction with multiple scraping strategies, semantic chunking, embedding-based retrieval with reranking, and optimized context building for LLM integration. Moreover all the components are self-hosted and open source, making it flexible for various use cases. This report details our implementation, architecture decisions, and evaluation methodology.  
+This project implements an advanced conversational agent that leverages Retrieval-Augmented Generation (RAG) to enhance response quality and factual accuracy. Unlike traditional chatbots relying solely on pre-trained knowledge, our system incorporates real-time web scraping capabilities to retrieve up-to-date information from the internet. Our implementation features a modular pipeline architecture that includes query enhancement, web search via SearXNG, content extraction, semantic chunking, embedding-based retrieval with reranking, and optimized context building for LLM integration. All components are self-hosted and open source, making it flexible for various use cases. Experimental evaluation demonstrates substantial performance improvements, with our system achieving 72.6\% accuracy compared to 18.2\% for a plain LLM baseline on the SimpleQA dataset, and 92\% accuracy on a custom dataset of 100 self-created questions.
 }  
   
 %----------------------------------------------------------------------------------------  
@@ -261,6 +261,26 @@ All models are self-hosted or run locally, using VLLM inference server for the L
 \subsection*{Evaluation Methodology}
 To evaluate our RAG system's performance, we conducted extensive testing using the SimpleQA dataset, comprising 1000 carefully curated question-answer pairs. The evaluation focused on assessing both the system's ability to retrieve relevant information and generate accurate responses across different types of questions.
 
+\subsubsection*{Experimental Setup}
+Our experiments were conducted using the following system parameters:
+\begin{itemize}[noitemsep]
+    \item \textbf{Query Enhancement}: Maximum of 3 enhanced queries per user question
+    \item \textbf{Web Search}: Maximum of 10 sources retrieved per query
+    \item \textbf{Content Processing}: 1000-character chunks with 100-character overlap
+    \item \textbf{Retrieval}: Top-50 initial candidates, refined to top-20 after reranking
+    \item \textbf{Models}: BAAI/bge-multilingual-gemma2 for embeddings, Nemotron-3 70B for LLM
+    \item \textbf{Quality Filter}: Content quality classifier with configurable threshold (enabled/disabled)
+\end{itemize}
+
+\subsubsection*{Experimental Design}
+We conducted three distinct experiments to evaluate different system configurations:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Plain LLM}: Baseline using only the large language model without any retrieval augmentation
+    \item \textbf{Ours}: Our complete RAG search pipeline with real-time web scraping and content processing
+    \item \textbf{Ours + Quality Filter}: Our system enhanced with content quality filtering to remove low-quality web content
+\end{enumerate}
+
 \subsubsection*{Dataset and Evaluation Process}
 The SimpleQA dataset includes a diverse range of questions covering various topics and answer types, including:
 \begin{itemize}[noitemsep]
@@ -275,9 +295,9 @@ The SimpleQA dataset includes a diverse range of questions covering various topi
 We employed a rigorous automated grading system using a large language model to evaluate response accuracy. The grading system categorized each response into one of three categories:
 
 \begin{itemize}[noitemsep]
-    \item \textbf{CORRECT (A)}: Responses that fully contain the important information from the gold target without contradictions. This includes answers that may have additional context but maintain factual accuracy.
-    \item \textbf{INCORRECT (B)}: Responses containing any factual contradictions with the gold target, even if presented with hedging language.
-    \item \textbf{NOT ATTEMPTED (C)}: Responses that neither confirm nor contradict the gold target, including explicit acknowledgments of uncertainty.
+    \item \textbf{Correct (A)}: Responses that fully contain the important information from the gold target without contradictions. This includes answers that may have additional context but maintain factual accuracy.
+    \item \textbf{Incorrect (B)}: Responses containing any factual contradictions with the gold target, even if presented with hedging language.
+    \item \textbf{Not Attempted (C)}: Responses that neither confirm nor contradict the gold target, including explicit acknowledgments of uncertainty.
 \end{itemize}
 
 The grading system was particularly nuanced in handling:
@@ -288,14 +308,76 @@ The grading system was particularly nuanced in handling:
     \item Context-dependent completeness of answers
 \end{itemize}
 
-\subsubsection*{Performance Results}
-The system demonstrated strong performance across the evaluation dataset, achieving an overall accuracy of 74.1\% on 690 test questions. This high accuracy rate is particularly noteworthy given the diverse and challenging nature of the questions in the SimpleQA dataset, indicating that our RAG pipeline effectively combines real-time information retrieval with accurate response generation.
+\textbf{Evaluation Limitation:} It should be noted that we used the same LLM family (Nemotron-3 70B) for both response generation and evaluation. While this ensures consistency in evaluation criteria, human-checked results could potentially differ by a few percentage points due to different interpretation standards and subjective judgment in edge cases.
+
+\subsection*{Results and Analysis}
+
+Our experimental evaluation demonstrates the significant impact of retrieval-augmented generation on question-answering performance. Figure \ref{fig:accuracy_comparison} presents the overall accuracy comparison across our three experimental configurations, while Figure \ref{fig:grade_distribution} shows the detailed distribution of response quality categories.
+
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.5\textwidth]{fig/distribution_answer_types.pdf}
-\caption{Distribution of Answer Types and Accuracy}
+\includegraphics[width=0.5\textwidth]{accuracy_comparison.pdf}
+\caption{Overall accuracy comparison across experimental configurations. Our RAG search pipeline achieves 72.6\% accuracy compared to 18.2\% for the plain LLM baseline, representing significantimprovement.}
+\label{fig:accuracy_comparison}
 \end{figure}
-\newpage
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.5\textwidth]{grade_distribution.pdf}
+\caption{Distribution of response quality across experiments. The chart shows the number of questions receiving Correct (A), Incorrect (B), or Not Attempted (C) grades for each system configuration.}
+\label{fig:grade_distribution}
+\end{figure}
+
+\subsubsection*{Performance Results}
+The experimental results reveal substantial performance improvements when incorporating real-time web retrieval:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Plain LLM}: Achieved only \textbf{18.2\% accuracy} (182/1001 questions correct), with 47.1\% of questions not attempted and 34.8\% answered incorrectly
+    \item \textbf{Ours}: Reached \textbf{72.6\% accuracy} (727/1001 questions correct), representing a substantial improvement over the baseline
+    \item \textbf{Ours + Quality Filter}: Obtained \textbf{66.6\% accuracy} (667/1001 questions correct), showing decreased performance compared to the unfiltered system
+\end{itemize}
+
+\subsubsection*{Impact Analysis}
+Our experiments clearly demonstrate that our RAG search pipeline significantly enhances LLM performance on factual question answering. The plain LLM achieved 18.2\% accuracy, while our complete pipeline achieved 72.6\% accuracy, showing that our system performs substantially better. This validates the effectiveness of real-time web retrieval and content processing in providing LLMs with current, relevant information.
+
+Interestingly, we discovered that filtering paragraphs and links from scraped web content actually degraded performance. The quality-enhanced version achieved 66.6\% accuracy compared to 72.6\% without filtering, indicating that the unfiltered system performed better. This suggests that the content quality classifier may have been overly conservative, removing potentially useful information alongside low-quality content.
+
+\subsubsection*{Custom Dataset Evaluation}
+To further validate our system's capabilities, we created a separate curated dataset of 100 questions that we came up with ourselves, covering diverse topics and query types. Our pipeline performed exceptionally well on this custom dataset, achieving \textbf{92\% accuracy} (92 out of 100 questions correct). This high performance on hand-curated questions demonstrates the system's robustness across different question types and domains.
+
+Notably, the system performed effectively even on Slovenian queries, showcasing its multilingual capabilities and the effectiveness of our multilingual embedding model (BAAI/bge-multilingual-gemma2) in handling non-English content retrieval and processing.
+
+\subsubsection*{System Reliability}
+Our analysis identified consistent performance patterns across different question types. The substantial improvement from 18.2\% to 72.6\% accuracy validates our core hypothesis that real-time web retrieval significantly enhances LLM performance on knowledge-intensive tasks. The system's ability to achieve over 92\% accuracy on curated samples while maintaining strong performance on large-scale evaluation demonstrates its practical value for real-world applications.
+
+\section*{Conclusion}
+
+This work presents a comprehensive implementation of a conversational agent enhanced with real-time Retrieval-Augmented Generation capabilities. Our system successfully addresses the fundamental limitations of traditional LLMs by incorporating dynamic web scraping and intelligent content processing to provide accurate, up-to-date responses to factual questions.
+
+\subsubsection*{Key Contributions}
+Our research makes several significant contributions to the field of conversational AI:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Real-time RAG Architecture}: We developed a modular, end-to-end pipeline that seamlessly integrates query enhancement, web search, content extraction, and response generation, all using self-hosted open-source components.
+    
+    \item \textbf{Performance Validation}: Our experiments demonstrate the critical value of external knowledge retrieval for factual question answering, with substantial improvements over baseline LLM performance.
+    
+    \item \textbf{Multilingual Capabilities}: The system effectively handles queries in multiple languages, including Slovenian, showcasing its versatility for diverse linguistic contexts.
+    
+    \item \textbf{Quality vs. Coverage Insights}: We identified that aggressive content filtering can degrade performance, providing valuable guidance for future RAG system design.
+\end{enumerate}
+
+\subsubsection*{Practical Implications}
+The substantial performance improvements validate the practical value of real-time web retrieval for knowledge-intensive applications. Our system's strong performance on both large-scale benchmarks and curated questions demonstrates its readiness for real-world deployment. The fully self-hosted architecture ensures data privacy and control, making it suitable for enterprise applications.
+
+\subsubsection*{Limitations and Future Work}
+While our results are promising, several limitations warrant consideration. The evaluation relied on automated LLM-based grading, which may differ from human judgment. Additionally, the system's performance depends on web content quality and availability, and processing latency may impact real-time user experience.
+
+Future research directions include optimizing quality filtering mechanisms, exploring more sophisticated query enhancement strategies, and investigating the integration of structured knowledge bases alongside web scraping to further improve accuracy and response completeness.
+
+Our work demonstrates that real-time RAG systems can significantly enhance conversational AI capabilities, providing a practical foundation for next-generation knowledge-augmented chatbots and virtual assistants.
+
+\textbf{Additional Contribution:} During our project development, we identified and contributed to fixing a critical bug in SearXNG, the open-source meta-search engine used in our pipeline. Our detailed bug report and proposed fix for the currency processor issue was accepted and merged into the main project \cite{searxng_bug}.
 
 \bibliographystyle{unsrt}
 \bibliography{report}
